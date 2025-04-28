@@ -1,0 +1,33 @@
+services:
+  # Nginx Service
+  nginx:
+    image: nginx:latest # image nginx контейнера
+    container_name: nginx_container # Название контейнера
+    ports: # Блок, отвечающий за проброс портов
+      - "443:443"
+    volumes: # Директории, которае прицепляются к контейнеру nginx
+      - ./nginx-webapp/conf.d:/etc/nginx/conf.d
+      - ./nginx-webapp/certs:/etc/nginx/certs
+    depends_on: # Зависимость от запуска web приложения. Если web приложение не запустится, то nginx тоже не запустится
+      - web
+
+  gitlab:
+    image: gitlab/gitlab-ce:latest  # image gitlab контейнера
+    hostname: gitlab.example.com  # Альтернативное название хоста контейнера
+    environment: # Блок, отвечающий за проброс переменных в контейнер
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab.example.com'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+    ports: # Блок, отвечающий за проброс портов
+      - "2222:22"    # SSH (альтернативный порт)
+    volumes: # Директории, которае прицепляются к контейнеру gitlab
+      - gitlab_config:/etc/gitlab
+      - gitlab_logs:/var/log/gitlab
+      - gitlab_data:/var/opt/gitlab
+    restart: unless-stopped
+
+# Тома для хранения данных
+volumes:
+  gitlab_config:
+  gitlab_logs:
+  gitlab_data:

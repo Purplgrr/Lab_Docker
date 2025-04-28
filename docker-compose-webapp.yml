@@ -1,0 +1,47 @@
+services:
+  # Web Service
+  web:
+    build: . # Сборка приложения с помощью Dockerfile, который находится в одной директории с Docker-compose.yml
+    container_name: flask_app # Название контейнера
+    env_file: # .env файл, который содержит переменные для работы приложения
+      - ./.env
+    depends_on: # Зависимость от запуска redis. Если redis не запустится, то приложение тоже не запустится
+      - redis
+    volumes: # Директория, которая прицепляется к контейнеру web
+      - .:/app
+    command: flask run --host=0.0.0.0 -p ${FLASK_PORT} # Команда для запуска flask приложения
+
+  # Redis database
+  redis: 
+    image: redis:latest # image redis контейнера
+    container_name: redis_container # Название контейнера
+    environment: # Блок, отвечающий за проброс переменных в контейнер
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_USER=${REDIS_USER}
+      - REDIS_USER_PASSWORD=${REDIS_USER_PASSWORD}
+    volumes:  # Директория, которая прицепляется к контейнеру redis
+      - ./redisdata:/data
+    command: > # Команды для конфигурации redis базы данных
+      sh -c '
+        mkdir -p /usr/local/etc/redis &&
+        echo "bind 0.0.0.0" > /usr/local/etc/redis/redis.conf &&
+        echo "requirepass $REDIS_PASSWORD" >> /usr/local/etc/redis/redis.conf &&
+        echo "appendonly yes" >> /usr/local/etc/redis/redis.conf &&
+        echo "appendfsync everysec" >> /usr/local/etc/redis/redis.conf &&
+        echo "user default on nopass ~* +@all" > /usr/local/etc/redis/users.acl &&
+        echo "user $REDIS_USER on >$REDIS_USER_PASSWORD ~* +@all" >> /usr/local/etc/redis/users.acl &&
+        redis-server /usr/local/etc/redis/redis.conf --aclfile /usr/local/etc/redis/users.acl
+      '
+    restart: unless-stopped # Блок, отвечающий за поведение контейнера при его остановке
+
+  # Nginx Service
+  nginx:
+    image: nginx:latest # image nginx контейнера
+    container_name: nginx_container # Название контейнера
+    ports: # Блок, отвечающий за проброс портов
+      - "443:443"
+    volumes: # Директории, которае прицепляются к контейнеру nginx
+      - ./nginx-webapp/conf.d:/etc/nginx/conf.d
+      - ./nginx-webapp/certs:/etc/nginx/certs
+    depends_on: # Зависимость от запуска web приложения. Если web приложение не запустится, то nginx тоже не запустится
+      - web
